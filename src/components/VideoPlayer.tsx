@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Square, Loader2 } from 'lucide-react';
+import { Play, Pause, Square, Loader2, Maximize, Minimize } from 'lucide-react';
 
 declare global {
     interface Window {
@@ -26,10 +26,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     initialStartTime = 0,
 }) => {
     const playerRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(initialStartTime);
     const [duration, setDuration] = useState(0);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const lastTimeRef = useRef(initialStartTime);
 
     // 時間のフォーマット (例: 1:30)
@@ -137,8 +139,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const toggleFullscreen = async () => {
+        if (!document.fullscreenElement) {
+            if (containerRef.current?.requestFullscreen) {
+                await containerRef.current.requestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            }
+        }
+    };
+
     return (
-        <div className="relative w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl group">
+        <div 
+            ref={containerRef}
+            className={`relative w-full bg-slate-900 overflow-hidden shadow-2xl group transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'rounded-2xl aspect-video'}`}
+        >
             <div id="youtube-player" className="w-full h-full" />
             
             {/* シークバー (非操作) */}
@@ -170,8 +195,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     {formatTime(currentTime)} / {formatTime(duration)}
                 </div>
 
-                <div className="ml-auto text-xs font-black text-slate-500 uppercase tracking-widest bg-slate-800 px-3 py-1 rounded-full">
-                    {isPlaying ? '再生中' : '一時停止中'}
+                <div className="ml-auto flex items-center gap-4">
+                    <div className="text-xs font-black text-slate-500 uppercase tracking-widest bg-slate-800 px-3 py-1 rounded-full">
+                        {isPlaying ? '再生中' : '一時停止中'}
+                    </div>
+                    <button 
+                        onClick={toggleFullscreen}
+                        className="p-2 text-white hover:text-indigo-400 transition-colors"
+                        title={isFullscreen ? '元のサイズに戻す' : '最大化する'}
+                    >
+                        {isFullscreen ? <Minimize className="w-5 h-5 bg-transparent" /> : <Maximize className="w-5 h-5 bg-transparent" />}
+                    </button>
                 </div>
             </div>
 

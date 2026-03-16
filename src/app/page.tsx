@@ -2,14 +2,29 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ShieldCheck, Video, FileCheck, BarChart3, ChevronRight, Award } from 'lucide-react';
+import { ShieldCheck, Video, FileCheck, BarChart3, ChevronRight, Award, Power } from 'lucide-react';
 
 export default function Home() {
+  const handleCloseApp = () => {
+    if (typeof window !== 'undefined') {
+      window.close();
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
+    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden no-scrollbar">
       {/* Background patterns */}
       <div className="absolute top-0 left-0 w-full h-[100vh] bg-[radial-gradient(circle_at_50%_0%,rgba(79,70,229,0.08),transparent_50%)] pointer-events-none" />
       <div className="absolute top-[20%] right-[-10%] w-[500px] h-[500px] bg-indigo-50 rounded-full blur-[120px] pointer-events-none opacity-60" />
+
+      {/* App Close Button */}
+      <button 
+        onClick={handleCloseApp} 
+        className="fixed top-6 right-6 z-50 px-6 py-4 bg-white hover:bg-red-50 text-slate-500 hover:text-red-500 rounded-2xl shadow-xl transition-all flex items-center gap-3 group border border-slate-100"
+      >
+        <Power className="w-6 h-6 group-hover:scale-110 transition-transform" />
+        <span className="font-bold text-sm tracking-widest hidden sm:inline">アプリを終了</span>
+      </button>
 
       {/* Nav */}
       <nav className="relative z-10 max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">

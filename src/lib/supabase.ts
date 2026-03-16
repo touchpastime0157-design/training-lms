@@ -56,19 +56,18 @@ export class PersistenceService {
         return !!localStorage.getItem(this.ADMIN_SESSION_KEY);
     }
 
-    // 名前のみでログイン（登録済みのユーザーのみ）
-    static async loginByName(name: string): Promise<boolean> {
-        if (typeof window === 'undefined') return false;
-        
-        // 名簿をチェック
+    static async getRegisteredUsers(): Promise<{id: string; name: string}[]> {
+        if (typeof window === 'undefined') return [];
         const users = JSON.parse(localStorage.getItem(this.USER_LIST_KEY) || '{}');
-        const userId = this.generateId(name);
+        return Object.values(users).map((u: any) => ({ id: u.id, name: u.name }));
+    }
+
+    static async loginByNames(names: string[]): Promise<boolean> {
+        if (typeof window === 'undefined') return false;
+        if (names.length === 0) return false;
         
-        if (users[userId]) {
-            localStorage.setItem(this.USER_SESSION_KEY, name);
-            return true;
-        }
-        return false;
+        localStorage.setItem(this.USER_SESSION_KEY, JSON.stringify(names));
+        return true;
     }
 
     // 現在の年月を取得 (YYYY-MM)
@@ -107,45 +106,110 @@ export class PersistenceService {
         localStorage.removeItem(this.ADMIN_SESSION_KEY);
     }
 
-    // 現在のユーザー情報を取得
-    static async getCurrentUser() {
-        if (typeof window === 'undefined') return null;
+    // 現在のユーザー情報を取得（複数対応）
+    static async getCurrentUsers() {
+        if (typeof window === 'undefined') return [];
         
-        const storedName = localStorage.getItem(this.USER_SESSION_KEY);
-        if (storedName) {
-            return { id: this.generateId(storedName), name: storedName, role: 'user' };
+        const stored = localStorage.getItem(this.USER_SESSION_KEY);
+        if (!stored) return [];
+        
+        try {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+                return parsed.map((name: string) => ({ id: this.generateId(name), name, role: 'user' }));
+            } else {
+                return [{ id: this.generateId(parsed), name: parsed, role: 'user' }];
+            }
+        } catch (e) {
+            return [{ id: this.generateId(stored), name: stored, role: 'user' }];
         }
-        return null;
     }
 
-    // データの取得（期間指定が可能）
-    static async getProgress(period?: string): Promise<Record<number, { watched_sec: number, completed: boolean }>> {
-        const user = await this.getCurrentUser();
-        if (!user) return {};
+    // データの取得（複数ユーザーの場合は全員の共通進捗を返す）
+    static async getProgress(period?: string): Promise<Record<number, { watched_sec: number, completed: boolean, percentage?: number, last_updated?: string }>> {
+        const users = await this.getCurrentUsers();
+        if (users.length === 0) return {};
         
         const targetPeriod = period || this.getPeriod();
         const allData = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
-        const userHistory = allData[user.id] || {};
+
+        // 複数名の場合は、全員のデータの「最小値」をとることで、全員が共通して完了している部分のみを表示する
+        const combinedProgress: Record<number, { watched_sec: number, completed: boolean, percentage: number, last_updated: string }> = {};
         
-        return userHistory[targetPeriod] || {};
+        // 項目1-12について集計
+        for (let i = 1; i <= 12; i++) {
+            let minWatched = Infinity;
+            let allCompleted = true;
+            let minPercentage = Infinity;
+            let latestUpdate = '';
+
+            for (const user of users) {
+                const userHistory = allData[user.id] || {};
+                const periodLogs = userHistory[targetPeriod] || {};
+                const log = periodLogs[i];
+
+                const watched = log?.watched_sec || 0;
+                const completed = !!log?.completed;
+                const percent = log?.percentage || 0;
+                
+                if (watched < minWatched) minWatched = watched;
+                if (!completed) allCompleted = false;
+                if (percent < minPercentage) minPercentage = percent;
+                if (log?.last_updated && log.last_updated > latestUpdate) latestUpdate = log.last_updated;
+            }
+
+            if (minWatched === Infinity) minWatched = 0;
+            if (minPercentage === Infinity) minPercentage = 0;
+
+            combinedProgress[i] = {
+                watched_sec: minWatched,
+                completed: allCompleted,
+                percentage: minPercentage,
+                last_updated: latestUpdate || '-'
+            };
+        }
+        
+        return combinedProgress;
     }
 
     // 進捗の保存（現在の年月で保存）
     static async saveProgress(curriculumId: number, watchedSec: number, totalSec: number, completed: boolean) {
-        const user = await this.getCurrentUser();
-        if (!user) return;
+        const users = await this.getCurrentUsers();
+        if (users.length === 0) return;
 
         const period = this.getPeriod();
         const allData = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
         
-        if (!allData[user.id]) allData[user.id] = {};
-        if (!allData[user.id][period]) allData[user.id][period] = {};
-        
-        allData[user.id][period][curriculumId] = { watched_sec: watchedSec, completed: completed };
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allData));
+        for (const user of users) {
+            if (!allData[user.id]) allData[user.id] = {};
+            if (!allData[user.id][period]) allData[user.id][period] = {};
+            
+            const existing = allData[user.id][period][curriculumId];
+            const maxWatchedSec = existing ? Math.max(existing.watched_sec, watchedSec) : watchedSec;
+            const isCompletedNow = completed || (existing && existing.completed);
 
-        // 名簿の最終アクティブ日を更新
-        this.registerUser(user.name);
+            let percentage = 0;
+            if (totalSec > 0) {
+                const p = (maxWatchedSec / totalSec) * 100;
+                // 99.9%以上なら100%（完了）、それ以外は切り捨て
+                percentage = p >= 99.9 ? 100 : Math.floor(p);
+            }
+            
+            if (isCompletedNow) percentage = 100;
+
+            const existingPercentage = existing?.percentage || 0;
+            const finalPercentage = Math.max(existingPercentage, percentage);
+            const finalCompleted = isCompletedNow || finalPercentage >= 100;
+
+            allData[user.id][period][curriculumId] = { 
+                watched_sec: maxWatchedSec, 
+                completed: finalCompleted,
+                percentage: finalPercentage,
+                last_updated: new Date().toLocaleDateString('ja-JP') + ' ' + new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})
+            };
+            this.registerUser(user.name);
+        }
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allData));
     }
 
     // 全管理者の取得（パスワード込み）
@@ -232,6 +296,44 @@ export class PersistenceService {
         });
 
         return stats;
+    }
+
+    // 特定ユーザーの詳細データ取得
+    static async getUserDetails(userId: string, period?: string) {
+        if (typeof window === 'undefined') return null;
+        
+        const targetPeriod = period || this.getPeriod();
+        const users = JSON.parse(localStorage.getItem(this.USER_LIST_KEY) || '{}');
+        const user = users[userId];
+        if (!user) return null;
+
+        const allLearningData = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+        const userHistory = allLearningData[userId] || {};
+        const periodLogs = userHistory[targetPeriod] || {};
+
+        let totalProgress = 0;
+        const items = [];
+        for (let i = 1; i <= 12; i++) {
+            const log = periodLogs[i];
+            const p = log ? (log.completed ? 100 : (log.percentage || 0)) : 0;
+            totalProgress += p;
+            
+            items.push({
+                curriculumId: i,
+                percentage: p,
+                status: log ? (log.completed ? '完了' : '学習中') : '未着手',
+                lastUpdated: log?.last_updated || '-'
+            });
+        }
+
+        const overallPercentage = Math.floor(totalProgress / 12);
+
+        return {
+            id: userId,
+            name: user.name,
+            overallPercentage,
+            items
+        };
     }
 
     // 年次レポート用の統計取得

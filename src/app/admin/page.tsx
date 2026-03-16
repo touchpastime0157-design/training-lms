@@ -18,8 +18,10 @@ import {
     Plus,
     Trash2,
     Edit2,
-    Shield
+    Shield,
+    X
 } from 'lucide-react';
+import { CURRICULUM_DATA } from '@/constants/curriculum';
 
 export default function AdminDashboard() {
     const router = useRouter();
@@ -35,6 +37,13 @@ export default function AdminDashboard() {
     const [newUserName, setNewUserName] = useState('');
     const [newAdminName, setNewAdminName] = useState('');
     const [newAdminPassword, setNewAdminPassword] = useState('');
+    const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
+
+    const handleViewDetail = async (userId: string) => {
+        const period = `${selectedYear}-${selectedMonth}`;
+        const detail = await PersistenceService.getUserDetails(userId, period);
+        setSelectedUserDetail(detail);
+    };
 
     const loadData = async () => {
         const loggedIn = await PersistenceService.isAdminLoggedIn();
@@ -150,7 +159,7 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex">
+        <div className="h-screen overflow-hidden bg-slate-50 flex">
             {/* Sidebar */}
             <aside className="w-64 bg-slate-900 text-white hidden lg:flex flex-col sticky top-0 h-screen shrink-0">
                 <div className="p-8">
@@ -194,7 +203,7 @@ export default function AdminDashboard() {
             </aside>
 
             {/* Main */}
-            <main className="flex-1 min-w-0 p-8 overflow-y-auto">
+            <main className="flex-1 min-w-0 p-8 overflow-y-auto no-scrollbar">
                 <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-6">
                     <div>
                         <h2 className="text-3xl font-black text-slate-900 leading-tight">
@@ -294,7 +303,10 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td className="px-8 py-5 text-sm text-slate-500">{user.last_active}</td>
                                                     <td className="px-8 py-5 text-right">
-                                                        <button className="text-indigo-600 font-bold text-sm hover:underline flex items-center gap-1 ml-auto">
+                                                        <button 
+                                                            onClick={() => handleViewDetail(user.id)}
+                                                            className="text-indigo-600 font-bold text-sm hover:underline flex items-center gap-1 ml-auto"
+                                                        >
                                                             詳細 <ArrowUpRight className="w-4 h-4" />
                                                         </button>
                                                     </td>
@@ -488,6 +500,45 @@ export default function AdminDashboard() {
                         </div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">{activeTab === 'content' ? '教材管理' : 'システム設定'}</h3>
                         <p className="text-slate-500">この機能は現在準備中です。</p>
+                    </div>
+                )}
+
+                {selectedUserDetail && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 min-h-screen" onClick={() => setSelectedUserDetail(null)}>
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-800">{selectedUserDetail.name} さんの受講進捗</h3>
+                                    <p className="text-sm font-bold text-slate-500 mt-1">{selectedYear}年{selectedMonth}月分 | 全体進捗: <span className="text-indigo-600">{selectedUserDetail.overallPercentage}%</span></p>
+                                </div>
+                                <button onClick={() => setSelectedUserDetail(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            <div className="p-8 space-y-4 overflow-y-auto flex-1 no-scrollbar">
+                                {selectedUserDetail.items.map((item: any) => {
+                                    const curriculum = CURRICULUM_DATA.find(c => c.order_no === item.curriculumId);
+                                    return (
+                                        <div key={item.curriculumId} className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between p-4 border border-slate-100 rounded-2xl hover:border-indigo-100 transition-colors bg-slate-50/30">
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">項目 {item.curriculumId}</span>
+                                                <h4 className="font-bold text-slate-800 truncate">{curriculum?.title}</h4>
+                                            </div>
+                                            <div className="flex items-center gap-6 sm:w-auto mt-2 sm:mt-0">
+                                                <div className="text-right w-20 shrink-0">
+                                                    <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider mb-1">進捗</span>
+                                                    <span className={`text-lg font-black ${item.percentage >= 100 ? 'text-green-600' : (item.percentage > 0 ? 'text-indigo-600' : 'text-slate-400')}`}>{item.percentage}%</span>
+                                                </div>
+                                                <div className="text-right w-36 border-l border-slate-100 pl-6 shrink-0">
+                                                    <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider mb-1">最終受講日時</span>
+                                                    <span className="text-sm font-bold text-slate-700">{item.lastUpdated}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>

@@ -11,13 +11,13 @@ export default function Dashboard() {
     const router = useRouter();
     const [progress, setProgress] = useState<Record<number, number>>({});
     const [completed, setCompleted] = useState<number[]>([]);
-    const [user, setUser] = useState<any>(null);
+    const [users, setUsers] = useState<any[]>([]);
 
     // 実データの読み込み
     useEffect(() => {
         const fetchUserData = async () => {
-            const currentUser = await PersistenceService.getCurrentUser();
-            setUser(currentUser);
+            const currentUsers = await PersistenceService.getCurrentUsers();
+            setUsers(currentUsers);
             
             // 現在の年月の進捗を取得 (月が替われば自動的に空になる)
             const data = await PersistenceService.getProgress();
@@ -26,8 +26,11 @@ export default function Dashboard() {
 
             Object.entries(data).forEach(([id, stats]) => {
                 const curriculumId = parseInt(id);
-                progMap[curriculumId] = stats.completed ? 100 : Math.min(99, 10);
-                if (stats.completed) compList.push(curriculumId);
+                // 98%以上を100%として表示
+                const currentP = stats.percentage || 0;
+                const isItemDone = stats.completed || currentP >= 98;
+                progMap[curriculumId] = isItemDone ? 100 : currentP;
+                if (isItemDone) compList.push(curriculumId);
             });
 
             setProgress(progMap);
@@ -41,7 +44,7 @@ export default function Dashboard() {
     const totalProgress = Math.floor((completed.length / 12) * 100);
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
             {/* Header */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -54,7 +57,9 @@ export default function Dashboard() {
                     <div className="flex items-center gap-6">
                         <div className="text-right hidden sm:block">
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">現在のユーザー</p>
-                            <p className="text-sm font-bold text-slate-700">{user?.name || user?.email}</p>
+                            <p className="text-sm font-bold text-slate-700">
+                                {users.length > 0 ? users.map(u => u.name).join(', ') : '未設定'}
+                            </p>
                         </div>
                         <button 
                             onClick={async () => {
@@ -70,12 +75,13 @@ export default function Dashboard() {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                {/* Progress Overview Card */}
+            <main className="flex-1 w-full overflow-y-auto no-scrollbar pb-10">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {/* Progress Overview Card */}
                 <div className="bg-gradient-to-br from-indigo-700 to-violet-800 rounded-3xl p-8 mb-12 shadow-2xl shadow-indigo-200 text-white relative overflow-hidden">
                     <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                         <div className="md:col-span-2">
-                            <h2 className="text-3xl font-bold mb-4">こんにちは、{user?.name || user?.email || '受講者'}さん！</h2>
+                            <h2 className="text-3xl font-bold mb-4">{users.length > 0 ? users.map(u => u.name).join('さん、') + 'さん' : '受講者さん'}！</h2>
                             <p className="text-indigo-100 mb-8 text-lg max-w-xl">
                                 <span className="underline decoration-indigo-400 underline-offset-4">{year}年{parseInt(month)}月分</span> の教育プログラムを完了しましょう。
                             </p>
@@ -168,6 +174,7 @@ export default function Dashboard() {
                             </Link>
                         );
                     })}
+                </div>
                 </div>
             </main>
         </div>

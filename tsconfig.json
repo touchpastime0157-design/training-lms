@@ -24,11 +24,16 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
+    "src/components/Quiz.tsx",
+    "src/components/VideoPlayer.tsx",
+    "src/lib/supabase.ts",
+    "src/lib/pdf-export.ts",
+    "src/lib/csv-export.ts",
+    "src/constants/**/*.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "electron", "src/pages", "src/stores", "src/composables", "src/lib/youtubePlayer.ts"]
 }
