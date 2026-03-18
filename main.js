@@ -74,8 +74,11 @@ function serveApp(appPath) {
   });
 
   return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () => {
-      resolve(server.address().port);
+    // ポートを固定することで Origin (http://127.0.0.1:39393) を一定に保ち、
+    // localStorage のデータが消えないようにします。
+    const FIXED_PORT = 39393;
+    server.listen(FIXED_PORT, '127.0.0.1', () => {
+      resolve(FIXED_PORT);
     });
   });
 }
