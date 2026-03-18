@@ -27,6 +27,8 @@ export default function AdminDashboard() {
     const router = useRouter();
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<any[]>([]);
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [editingUserName, setEditingUserName] = useState<string>('');
     const [annualData, setAnnualData] = useState<any[]>([]);
     const [admins, setAdmins] = useState<any[]>([]);
     const [stats, setStats] = useState({ total: 0, completed: 0, active: 0 });
@@ -105,11 +107,20 @@ export default function AdminDashboard() {
         loadData();
     };
 
-    const handleUpdateUser = async (id: string, currentName: string) => {
-        const newName = prompt(`${currentName} さんの新しい名前を入力してください。`, currentName);
-        if (newName && newName.trim() && newName !== currentName) {
-            await PersistenceService.updateUser(id, newName.trim());
-            loadData();
+    const handleUpdateUser = (id: string, currentName: string) => {
+        setEditingUserId(id);
+        setEditingUserName(currentName);
+    };
+
+    const confirmUpdateUser = async (id: string) => {
+        if (!editingUserName.trim()) return;
+        try {
+            await PersistenceService.updateUser(id, editingUserName.trim());
+            setEditingUserId(null);
+            await loadData();
+        } catch (err) {
+            console.error('Update failed:', err);
+            alert('名前の変更に失敗しました。');
         }
     };
 
@@ -387,7 +398,37 @@ export default function AdminDashboard() {
                                         <tbody className="divide-y divide-slate-100">
                                             {users.map((user) => (
                                                 <tr key={user.id} className="hover:bg-slate-50/50 transition">
-                                                    <td className="px-8 py-5 font-bold text-slate-800">{user.name}</td>
+                                                    <td className="px-8 py-5 font-bold text-slate-800">
+                                                        {editingUserId === user.id ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <input 
+                                                                    type="text"
+                                                                    value={editingUserName}
+                                                                    onChange={(e) => setEditingUserName(e.target.value)}
+                                                                    className="px-3 py-1 bg-white border border-indigo-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[200px]"
+                                                                    autoFocus
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') confirmUpdateUser(user.id);
+                                                                        if (e.key === 'Escape') setEditingUserId(null);
+                                                                    }}
+                                                                />
+                                                                <button 
+                                                                    onClick={() => confirmUpdateUser(user.id)}
+                                                                    className="p-1 px-2 bg-indigo-600 text-white rounded-md text-xs hover:bg-indigo-700"
+                                                                >
+                                                                    OK
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setEditingUserId(null)}
+                                                                    className="p-1 px-2 bg-slate-200 text-slate-600 rounded-md text-xs hover:bg-slate-300"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            user.name
+                                                        )}
+                                                    </td>
                                                     <td className="px-8 py-5 text-sm font-mono text-slate-400">{user.id}</td>
                                                     <td className="px-8 py-5 text-right space-x-2">
                                                         <button 
