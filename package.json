@@ -44,7 +44,19 @@
       "output": "dist-exe"
     },
     "win": {
-      "target": "portable"
+      "target": [
+        "nsis",
+        "dir"
+      ],
+      "icon": "icon.png",
+      "artifactName": "TransportLMS.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "TransportLMS"
     },
     "files": [
       "out/**/*",

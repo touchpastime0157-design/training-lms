@@ -50,3 +50,7 @@ next-env.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+/TransportLMS_Ver1
+
+/20260324_*

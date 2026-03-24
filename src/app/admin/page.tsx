@@ -40,6 +40,9 @@ export default function AdminDashboard() {
     const [newAdminName, setNewAdminName] = useState('');
     const [newAdminPassword, setNewAdminPassword] = useState('');
     const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
+    const [editingAdminNameOriginal, setEditingAdminNameOriginal] = useState<string | null>(null);
+    const [editingAdminNameNew, setEditingAdminNameNew] = useState<string>('');
+    const [editingAdminPassword, setEditingAdminPassword] = useState<string>('');
 
     const handleViewDetail = async (userId: string) => {
         const period = `${selectedYear}-${selectedMonth}`;
@@ -140,17 +143,26 @@ export default function AdminDashboard() {
         loadData();
     };
 
-    const handleUpdateAdmin = async (oldName: string) => {
+    const handleUpdateAdmin = (oldName: string) => {
         if (oldName === 'admin') {
             alert('マスターアカウント(admin)の名前とパスワードは変更できません。');
             return;
         }
-        const newName = prompt('管理者の新しい名前を入力してください:', oldName);
-        if (!newName || !newName.trim()) return;
-        
-        const newPassword = prompt('新しいパスワードを入力してください(空の場合は変更なし):');
-        await PersistenceService.updateAdmin(oldName, newName.trim(), newPassword || undefined);
-        loadData();
+        setEditingAdminNameOriginal(oldName);
+        setEditingAdminNameNew(oldName);
+        setEditingAdminPassword(''); // パスワードは空でリセット（変更する場合のみ入力）
+    };
+
+    const confirmUpdateAdmin = async (oldName: string) => {
+        if (!editingAdminNameNew.trim()) return;
+        try {
+            await PersistenceService.updateAdmin(oldName, editingAdminNameNew.trim(), editingAdminPassword || undefined);
+            setEditingAdminNameOriginal(null);
+            await loadData();
+        } catch (err) {
+            console.error('Admin update failed:', err);
+            alert('管理者の更新に失敗しました。');
+        }
     };
 
     const handleDeleteAdmin = async (name: string) => {
@@ -507,22 +519,68 @@ export default function AdminDashboard() {
                                             </tr>
                                             {admins.filter(a => a.name !== 'admin').map((admin) => (
                                                 <tr key={admin.name} className="hover:bg-slate-50/50 transition">
-                                                    <td className="px-8 py-5 font-bold text-slate-800">{admin.name}</td>
+                                                    <td className="px-8 py-5 font-bold text-slate-800">
+                                                        {editingAdminNameOriginal === admin.name ? (
+                                                            <div className="flex flex-col gap-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-black text-slate-400 w-16">名前:</span>
+                                                                    <input 
+                                                                        type="text"
+                                                                        value={editingAdminNameNew}
+                                                                        onChange={(e) => setEditingAdminNameNew(e.target.value)}
+                                                                        className="px-3 py-1 bg-white border border-indigo-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[200px]"
+                                                                        autoFocus
+                                                                    />
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-black text-slate-400 w-16">パスワード:</span>
+                                                                    <input 
+                                                                        type="password"
+                                                                        value={editingAdminPassword}
+                                                                        onChange={(e) => setEditingAdminPassword(e.target.value)}
+                                                                        placeholder="空で変更なし"
+                                                                        className="px-3 py-1 bg-white border border-indigo-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[200px]"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            admin.name
+                                                        )}
+                                                    </td>
                                                     <td className="px-8 py-5 text-right space-x-2">
-                                                        <button 
-                                                            onClick={() => handleUpdateAdmin(admin.name)}
-                                                            className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
-                                                            title="設定変更"
-                                                        >
-                                                            <Edit2 className="w-5 h-5" />
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDeleteAdmin(admin.name)}
-                                                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                                                            title="削除"
-                                                        >
-                                                            <Trash2 className="w-5 h-5" />
-                                                        </button>
+                                                        {editingAdminNameOriginal === admin.name ? (
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <button 
+                                                                    onClick={() => confirmUpdateAdmin(admin.name)}
+                                                                    className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-sm"
+                                                                >
+                                                                    保存
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setEditingAdminNameOriginal(null)}
+                                                                    className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition"
+                                                                >
+                                                                    キャンセル
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => handleUpdateAdmin(admin.name)}
+                                                                    className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
+                                                                    title="設定変更"
+                                                                >
+                                                                    <Edit2 className="w-5 h-5" />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDeleteAdmin(admin.name)}
+                                                                    className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                                                                    title="削除"
+                                                                >
+                                                                    <Trash2 className="w-5 h-5" />
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
